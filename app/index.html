@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShopLite</title>
+<style>
+  :root {
+    --ink: #1F3A5F; --text: #22303C; --muted: #5B6B7A; --line: #D5DCE3;
+    --bg: #F3F6F9; --card: #FFFFFF; --accent: #E0A400; --error: #B3261E; --ok: #1E7B45;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  header { background: var(--ink); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+  header nav { display: flex; gap: 12px; align-items: center; }
+  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); }
+  .badge { background: var(--accent); color: var(--ink); border-radius: 10px; padding: 0 8px; font-weight: 700; margin-left: 4px; }
+  main { max-width: 760px; margin: 32px auto; padding: 0 16px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 24px; }
+  h2 { margin-top: 0; color: var(--ink); }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+  input[type=number] { width: 80px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: var(--ink); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .error { color: var(--error); margin-top: 8px; min-height: 1.5em; }
+  .success { color: var(--ok); }
+  .products { list-style: none; padding: 0; margin: 0; }
+  .products li, .cart-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .price { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .totals { margin-top: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+  .totals strong { font-size: 20px; color: var(--ink); }
+  .row { display: flex; gap: 8px; align-items: flex-end; margin-top: 16px; }
+  .row input { width: 180px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ShopLite</h1>
+  <nav id="nav" hidden>
+    <button id="nav-products" type="button">Products</button>
+    <button id="nav-cart" type="button">Cart <span class="badge" data-testid="cart-badge">0</span></button>
+    <button id="logout" type="button">Log out</button>
+  </nav>
+</header>
+
+<main>
+  <!-- LOGIN -->
+  <section id="view-login">
+    <h2>Log in</h2>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <p class="error" id="login-error" role="alert"></p>
+    <button id="login-btn" type="button" disabled>Log in</button>
+  </section>
+
+  <!-- PRODUCTS -->
+  <section id="view-products" hidden>
+    <h2>Products</h2>
+    <ul class="products" id="product-list"></ul>
+  </section>
+
+  <!-- CART -->
+  <section id="view-cart" hidden>
+    <h2>Your cart</h2>
+    <p id="cart-empty">Your cart is empty. Add something from Products.</p>
+    <div id="cart-rows"></div>
+    <p class="error" id="qty-error" role="alert"></p>
+    <div class="row">
+      <div>
+        <label for="promo">Promo code</label>
+        <input id="promo" type="text">
+      </div>
+      <button id="apply-promo" type="button" class="secondary">Apply</button>
+    </div>
+    <p id="promo-msg" role="status"></p>
+    <div class="totals">
+      <div>Subtotal: <span data-testid="subtotal"></span></div>
+      <div>Discount: <span data-testid="discount"></span></div>
+      <div>Total: <strong data-testid="cart-total"></strong></div>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button id="checkout-btn" type="button">Checkout</button>
+    </div>
+  </section>
+
+  <!-- CHECKOUT -->
+  <section id="view-checkout" hidden>
+    <h2>Checkout</h2>
+    <label for="full-name">Full name</label>
+    <input id="full-name" type="text" autocomplete="name">
+    <label for="checkout-email">Email for receipt</label>
+    <input id="checkout-email" type="text" autocomplete="email">
+    <p class="error" id="checkout-error" role="alert"></p>
+    <button id="place-order" type="button">Place order</button>
+  </section>
+
+  <!-- CONFIRMATION -->
+  <section id="view-confirmation" hidden>
+    <h2 class="success">Order placed</h2>
+    <p>Your order number is <strong data-testid="order-number"></strong>.</p>
+    <button id="continue-shopping" type="button" class="secondary">Continue shopping</button>
+  </section>
+</main>
+
+<script>
+(function () {
+  const USERS = { "demo@shoplite.test": "Passw0rd!" };
+  const PRODUCTS = [
+    { id: "notebook", name: "Dot-grid notebook", price: 19.99 },
+    { id: "pens",     name: "Gel pen set (5)",   price: 9.95 },
+    { id: "lamp",     name: "Desk lamp",         price: 49.00 },
+    { id: "mat",      name: "Desk mat",          price: 24.50 }
+  ];
+
+  let cart = [];            // [{id, qty}]
+  let discountRate = 0;     // 0.10 when promo applied
+  let promoApplied = false;
+
+  const $ = (id) => document.getElementById(id);
+  const views = ["login", "products", "cart", "checkout", "confirmation"];
+  function show(name) {
+    views.forEach(v => $("view-" + v).hidden = v !== name);
+    $("nav").hidden = name === "login";
+    if (name === "cart") renderCart();
+  }
+  const money = (n) => "$" + n.toFixed(2);
+
+  // ---------- Login ----------
+  function updateLoginBtn() {
+    $("login-btn").disabled = !($("email").value.trim() && $("password").value);
+  }
+  $("email").addEventListener("input", updateLoginBtn);
+  $("password").addEventListener("input", updateLoginBtn);
+  $("login-btn").addEventListener("click", () => {
+    const email = $("email").value.trim().toLowerCase();
+    const pw = $("password").value;
+    if (!(email in USERS)) {
+      $("login-error").textContent = "No account found for this email";
+      return;
+    }
+    if (USERS[email] !== pw) {
+      $("login-error").textContent = "Invalid email or password";
+      return;
+    }
+    $("login-error").textContent = "";
+    show("products");
+  });
+
+  // ---------- Products ----------
+  PRODUCTS.forEach(p => {
+    const li = document.createElement("li");
+    li.dataset.testid = "product-" + p.id;
+    li.innerHTML = `<span><span class="name">${p.name}</span> <span class="price">${money(p.price)}</span></span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Add to cart";
+    btn.setAttribute("aria-label", "Add " + p.name + " to cart");
+    btn.addEventListener("click", () => addToCart(p.id));
+    li.appendChild(btn);
+    $("product-list").appendChild(li);
+  });
+
+  function addToCart(id) {
+    const line = cart.find(l => l.id === id);
+    if (line) line.qty = Math.min(10, line.qty + 1);
+    else cart.push({ id, qty: 1 });
+    updateBadge();
+  }
+  function updateBadge() {
+    document.querySelector("[data-testid=cart-badge]").textContent =
+      cart.reduce((s, l) => s + l.qty, 0);
+  }
+
+  // ---------- Cart ----------
+  let checkoutLocked = true;
+  function renderCart() {
+    const rows = $("cart-rows");
+    rows.innerHTML = "";
+    $("cart-empty").hidden = cart.length > 0;
+    cart.forEach(line => {
+      const p = PRODUCTS.find(x => x.id === line.id);
+      const row = document.createElement("div");
+      row.className = "cart-row";
+      row.dataset.testid = "cart-row-" + p.id;
+      row.innerHTML = `<span>${p.name}</span>`;
+      const qtyLabel = document.createElement("label");
+      qtyLabel.textContent = "Qty";
+      qtyLabel.style.margin = "0";
+      const qty = document.createElement("input");
+      qty.type = "number";
+      qty.value = line.qty;
+      qty.setAttribute("aria-label", "Quantity for " + p.name);
+      qty.addEventListener("change", () => {
+        const n = parseInt(qty.value, 10);
+        if (isNaN(n) || n > 10) {
+          $("qty-error").textContent = "Quantity must be between 1 and 10";
+          qty.value = line.qty;
+          return;
+        }
+        $("qty-error").textContent = "";
+        line.qty = n;
+        updateBadge();
+        renderTotals();
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary";
+      remove.textContent = "Remove";
+      remove.setAttribute("aria-label", "Remove " + p.name);
+      remove.addEventListener("click", () => {
+        cart = cart.filter(l => l.id !== line.id);
+        updateBadge();
+        renderCart();
+      });
+      const right = document.createElement("span");
+      right.style.display = "flex"; right.style.gap = "8px"; right.style.alignItems = "center";
+      right.append(qtyLabel, qty, remove);
+      row.appendChild(right);
+      rows.appendChild(row);
+    });
+    if (checkoutLocked) $("checkout-btn").disabled = cart.length === 0;
+    if (cart.length > 0) checkoutLocked = false;
+    renderTotals();
+  }
+
+  function renderTotals() {
+    const subtotal = cart.reduce((s, l) => s + PRODUCTS.find(p => p.id === l.id).price * l.qty, 0);
+    const discount = subtotal * discountRate;
+    const total = subtotal - discount;
+    document.querySelector("[data-testid=subtotal]").textContent = money(subtotal);
+    document.querySelector("[data-testid=discount]").textContent = "-" + money(discount);
+    document.querySelector("[data-testid=cart-total]").textContent = "$" + total;
+  }
+
+  $("apply-promo").addEventListener("click", () => {
+    const code = $("promo").value.trim();
+    if (code === "SAVE10") {
+      discountRate += 0.10;
+      promoApplied = true;
+      $("promo-msg").textContent = "Promo applied: 10% off";
+    } else {
+      $("promo-msg").textContent = "Promo code not recognised";
+    }
+    renderTotals();
+  });
+
+  $("checkout-btn").addEventListener("click", () => {
+    if (cart.length === 0) return;
+    show("checkout");
+  });
+
+  // ---------- Checkout ----------
+  $("place-order").addEventListener("click", () => {
+    const name = $("full-name").value.trim();
+    const email = $("checkout-email").value.trim();
+    if (!name) { $("checkout-error").textContent = "Enter your full name"; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { $("checkout-error").textContent = "Enter a valid email"; return; }
+    $("checkout-error").textContent = "";
+    const num = "SL-" + String(Math.floor(Math.random() * 1e6)).padStart(6, "0");
+    document.querySelector("[data-testid=order-number]").textContent = num;
+    resetCart();
+    show("confirmation");
+  });
+  $("continue-shopping").addEventListener("click", () => show("products"));
+
+  function resetCart() {
+    cart = []; discountRate = 0; promoApplied = false; checkoutLocked = true;
+    $("promo").value = ""; $("promo-msg").textContent = ""; $("qty-error").textContent = "";
+    updateBadge();
+  }
+
+  // ---------- Nav ----------
+  $("nav-products").addEventListener("click", () => show("products"));
+  $("nav-cart").addEventListener("click", () => show("cart"));
+  $("logout").addEventListener("click", () => {
+    resetCart();
+    $("email").value = ""; $("password").value = ""; $("login-error").textContent = "";
+    updateLoginBtn();
+    show("login");
+  });
+})();
+</script>
+</body>
+</html>
