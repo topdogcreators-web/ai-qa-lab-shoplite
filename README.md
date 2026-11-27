@@ -3,7 +3,7 @@
 A tiny web shop with **14 requirements and 6 hidden bugs**. Give it to your AI and see
 how many it finds.
 
-📺 Watch the experiment: [YouTube link]
+📺 Watch the experiment: https://www.youtube.com/watch?v=WjPOU_I5UyA
 
 ## Run the app
 ```
